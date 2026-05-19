@@ -11,7 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
-from pathlib import Path
+from pathlib import Path 
+import datetime
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -42,12 +43,19 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
-    'django_elasticsearch_dsl',
+    'django_elasticsearch_dsl', 
+    'drf_spectacular',
+    'drf_spectacular_sidecar', 
+    'rest_framework_simplejwt.token_blacklist',
+    
     # Local apps
     'accounts',
     'shops',
     'products',
     'orders',
+    'merchants',
+    'utils',
+    'config'
 ]
 
 MIDDLEWARE = [
@@ -59,7 +67,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'config.middleware.APILoggingMiddleware',
+    'config.middleware.LoggingMiddleware', 
+    'config.middleware.ResponseHandler',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -67,10 +76,14 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            os.path.join(BASE_DIR, "templates"),
+            os.path.join(BASE_DIR, "../templates"),
+        ], 
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -128,21 +141,48 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
+# https://docs.djangoproject.com/en/5.2/howto/static-files/+
 
 STATIC_URL = 'static/'
+MEDIA_URL = 'media/'
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+    os.path.join(BASE_DIR, 'media')
+]
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'static', 'static_cdn')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'static', 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-AUTH_USER_MODEL = 'accounts.Merchant'
+AUTH_USER_MODEL = 'accounts.User'
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': datetime.timedelta(days=3),
+    'JWT_ALLOW_REFRESH': True,
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+}
 
 REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ), 
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+        'accounts.authentication.CustomJWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ),
+    'COERCE_DECIMAL_TO_STRING': False,
+    'DEFAULT_PAGINATION_CLASS': 'config.pagination.CustomPagination',
+    'PAGE_SIZE': 10,
+    'DATETIME_FORMAT': '%Y-%m-%d %H:%M:%S',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'EXCEPTION_HANDLER': 'config.exception.custom_exception_handler'
 }
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -156,39 +196,141 @@ ELASTICSEARCH_DSL = {
     },
 }
 
-LOGGING = {
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'BlazePay API',
+    'DESCRIPTION': 'Core API business management and services. ',
+    'CONTACT': {},
+    'LICENSE': {},
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'EXTERNAL_DOCS': {},
+    'EXTENSIONS_INFO': {},
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
+    'SERVE_AUTHENTICATION': [
+        'accounts.authentication.CustomJWTAuthentication',
+    ],
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        "persistAuthorization": True,
+        "displayOperationId": True,
+    },
+    'SWAGGER_UI_DIST': 'SIDECAR',  # shorthand to use the sidecar instead
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',
+    'ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE': True,
+    'CAMELIZE_NAMES': False,
+
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'bearerAuthTraxion': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+                'name': 'Authorization',
+                'in': 'header'
+            },
+        },
+    },
+    'POSTPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.postprocess_schema_enums',
+    ],
+    'SORT_OPERATIONS': False,
+    'SORT_OPERATION_PARAMETERS': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    # OTHER SETTINGS
+}
+APPEND_SLASH = False
+
+
+# ----------- Configs ------------------
+CORS_ALLOW_ALL_ORIGINS = False
+BASE_URL = "http://127.0.0.1:8000/"
+ACCESS_TOKEN_EXPIRATION_MINUTES = 1440 # 1 day
+REFRESH_TOKEN_EXPIRATION_MINUTES = 18720 # 13 days
+PROJECT_ENVIRONMENT = 'dev'
+CACHE_REQUEST_TIMEOUT_SECONDS = 120
+REDIS_LOCATION = "redis://redis:6379/1"
+SOCIAL_SECRET = 'xxxxxxxxxzxxxx'
+API_SECRET_KEY = 'x'
+
+
+CACHE_MIDDLEWARE_SECONDS = CACHE_REQUEST_TIMEOUT_SECONDS
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_LOCATION,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient"
+        },
+        'TIMEOUT': int(CACHE_REQUEST_TIMEOUT_SECONDS), # Cache timeout in seconds (e.g., 300 seconds = 5 minutes)
+    }
+}
+
+try:
+    from config.local import *
+except:
+    pass
+
+
+LOGGING = { 
     'version': 1,
-    'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
+            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
         },
-    },
+        'simple': {
+            'format': '%(levelname)s %(message)s'
+        },
+        'custom':{
+            'format':"API [%(levelname)s] %(asctime)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
+        },
+    }, 
     'handlers': {
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'django.log',
-            'maxBytes': 1024 * 1024 * 5, # 5 MB
+        'logging_handler':{
+            'class':'config.logger.CustomFileHandler',
+            'level': 'WARNING' if PROJECT_ENVIRONMENT == 'production' else 'DEBUG',
+            'formatter': 'custom',
+            'maxBytes': 31457280,  # 1024 * 1024 * 30B = 30MB
             'backupCount': 5,
-            'formatter': 'verbose',
+            'filename':'logs/api.log',
         },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'custom'
+        },  
     },
     'loggers': {
-        'django.request': {
-            'handlers': ['console', 'file'],
-            'level': 'WARNING',
-            'propagate': False,
+        'django': {
+            'handlers': ['logging_handler', 'console'],
+            'level': 'WARNING' if PROJECT_ENVIRONMENT == 'production' else 'DEBUG',
+            'propagate': True,
         },
-        '': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-        }
-    },
+        'django.db.backends': { 
+            'handlers': ['console'],
+            'level': 'WARNING',   # DEBUG will log all queries, so change it to WARNING.
+            'propagate': False,   # Don't propagate to other handlers
+        },
+        'django.utils.autoreload': {
+            'handlers': ['console'],
+            'level': 'WARNING',   # DEBUG will log all queries, so change it to WARNING.
+            'propagate': False,   # Don't propagate to other handlers
+        },
+        'django.template': {
+            'handlers': ['console'],
+            'level': 'WARNING',   # DEBUG will log all queries, so change it to WARNING.
+            'propagate': False,   # Don't propagate to other handlers
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'WARNING',   # DEBUG will log all queries, so change it to WARNING.
+            'propagate': False,   # Don't propagate to other handlers
+        },
+        'django.server': {
+            'handlers': ['console'],
+            'level': 'INFO',   # DEBUG will log all queries, so change it to WARNING.
+            'propagate': False,   # Don't propagate to other handlers
+        }, 
+    }
 }
