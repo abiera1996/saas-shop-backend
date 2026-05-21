@@ -35,7 +35,8 @@ class MerchantView(viewsets.GenericViewSet):
     queryset = Merchant.objects.all()
     serializer_class = serializers.MerchantDetailsSerializer
     action_serializers = {
-        'register': serializers.MerchantRegistrationSerializer
+        'initial_register': serializers.MerchantInitialRegistrationSerializer,
+        'register': serializers.MerchantRegistrationSerializer,
     }
 
     def get_serializer_class(self):
@@ -84,10 +85,10 @@ class MerchantView(viewsets.GenericViewSet):
             401: global_response_serializer.AuthenticationErrorSerializer
         }
     )
-    @action(detail=False, methods=['post'], url_path='register', permission_classes=[SecretKeySitesPermission])
-    def register(self, request, *args, **kwargs):
+    @action(detail=False, methods=['post'], url_path='initial-register', permission_classes=[SecretKeySitesPermission])
+    def initial_register(self, request, *args, **kwargs):
         """
-        Merchant registration setup.
+        Intialize Merchant registration.
         """
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
@@ -95,3 +96,31 @@ class MerchantView(viewsets.GenericViewSet):
             return Response(instance, 
                         status=status.HTTP_200_OK if instance['success'] else status.HTTP_400_BAD_REQUEST )
         return Response(serializer.get_error_response(), status=status.HTTP_400_BAD_REQUEST)
+
+    @extend_schema(  
+        auth=[],
+        parameters=list([
+            OpenApiParameter(
+                name="api-key", location=OpenApiParameter.HEADER, type=OpenApiTypes.STR, required=False, default="")
+        ]),
+        summary='Merchant Registration',
+        responses={
+            200: response_serializer.CustomerRegistrationSuccessResponseSerializer,
+            400: response_serializer.ErrorFieldCustomerRegistartionSerializer,
+            401: global_response_serializer.AuthenticationErrorSerializer
+        }
+    )
+    @action(detail=False, methods=['post'], url_path='register', permission_classes=[SecretKeySitesPermission])
+    def register(self, request, *args, **kwargs):
+        """
+        Merchant Registration Completion.
+        """
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            instance = serializer.save()
+            return Response(instance, 
+                        status=status.HTTP_200_OK if instance['success'] else status.HTTP_400_BAD_REQUEST )
+        return Response(serializer.get_error_response(), status=status.HTTP_400_BAD_REQUEST)
+
+
+    

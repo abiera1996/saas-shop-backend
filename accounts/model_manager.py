@@ -5,7 +5,7 @@ from utils.caching import CacheQueryManager, BaseModelMixin
 
 class UserManager(BaseUserManager, CacheQueryManager):
 
-    def create_user(self, username, role_id, email=None, mobile=None, first_name='', last_name='', auth_provider=3, password=None):
+    def create_user(self, username, role_id, email=None, mobile=None, mobile_country_code='', first_name='', last_name='', auth_provider=3, password=None):
         from accounts.models import Contact
         if username is None:
             raise TypeError('Users should have a username')
@@ -33,7 +33,8 @@ class UserManager(BaseUserManager, CacheQueryManager):
                 user=user,
                 contact_type=1,
                 is_primary=True,
-                contact_value=mobile
+                contact_value=mobile,
+                country_code=mobile_country_code
             )
         return user
 
