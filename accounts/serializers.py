@@ -1,6 +1,6 @@
 from utils import serializers as class_serializer
 from rest_framework import serializers 
-from accounts.models import User, Contact
+from accounts.models import User, Contact, Country, State, City
 from django.contrib.auth import authenticate
 from django.utils.timezone import now
 from utils import helpers
@@ -98,3 +98,21 @@ class GoogleSocialAuthSerializer(class_serializer.Serializer):
     def save(self, **kwargs):
         data = dict(self.validated_data.items()) 
         return data
+
+class CountrySerializer(serializers.ModelSerializer):
+    text = serializers.CharField(source='country')
+    class Meta:
+        model = Country
+        fields = ('id', 'text', 'country_code')
+
+class StateSerializer(serializers.ModelSerializer):
+    text = serializers.CharField(source='state')
+    class Meta:
+        model = State
+        fields = ('id', 'text', 'state_code')
+
+class CitySerializer(serializers.ModelSerializer):
+    text = serializers.CharField(source='city')
+    class Meta:
+        model = City
+        fields = ('id', 'text')

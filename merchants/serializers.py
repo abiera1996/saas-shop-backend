@@ -94,10 +94,12 @@ class MerchantRegistrationSerializer(class_serializer.ModelSerializer):
     activation_code = serializers.CharField() 
     password = serializers.CharField() 
     city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all(), required=True,  help_text="City ID")
-    
+    address = serializers.CharField()
+    address2 = serializers.CharField(required=False, allow_blank=True)
+
     class Meta:
         model = User
-        fields = ('activation_code', 'password', 'city')
+        fields = ('activation_code', 'password', 'city', 'address', 'address2')
     
     def validate(self, attrs):
         errors = dict()
@@ -177,6 +179,14 @@ class MerchantRegistrationSerializer(class_serializer.ModelSerializer):
             Merchant.objects.create(
                 user=user,
                 business_name=audit_data['business_name']
+            )
+
+            from accounts.models import Address
+            Address.objects.create(
+                user=user,
+                city=data['city'],
+                address=data['address'],
+                address2=data.get('address2', '')
             )
  
             return {
